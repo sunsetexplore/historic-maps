@@ -2,38 +2,267 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Bexar County Historic Aerials</title>
+  <title>Bexar Maps</title>
   <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet" />
-  <style> body { margin: 0; } #map { height: 100vh; } </style>
+  <style>
+    body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
+    #map { height: 100vh; }
+
+    #panels {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 260px;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .panel {
+      background: rgba(255,255,255,0.95);
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 12px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f3f3f3;
+      user-select: none;
+    }
+
+    .panel-body {
+      padding: 8px 12px 12px;
+      font-size: 13px;
+    }
+
+    .panel-body.collapsed { display: none; }
+
+    .layer-row {
+      margin-bottom: 10px;
+    }
+
+    .layer-row:last-child { margin-bottom: 0; }
+
+    .layer-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .layer-row input[type="range"] {
+      width: 100%;
+    }
+
+    .basemap-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+  </style>
 </head>
 <body>
 <div id="map"></div>
+
+<div id="panels">
+  <div class="panel" data-panel="basemaps">
+    <div class="panel-header">Basemaps <span class="chevron">▾</span></div>
+    <div class="panel-body" id="basemap-list"></div>
+  </div>
+
+  <div class="panel" data-panel="orthomosaics">
+    <div class="panel-header">Orthomosaics <span class="chevron">▾</span></div>
+    <div class="panel-body" id="ortho-list"></div>
+  </div>
+
+  <div class="panel" data-panel="georeferenced">
+    <div class="panel-header">Georeferenced Images <span class="chevron">▾</span></div>
+    <div class="panel-body" id="georef-list"></div>
+  </div>
+</div>
+
 <script>
+  // ---- CONFIG: edit these arrays to add/remove layers ----
+
+  const BASEMAPS = [
+    {
+      id: 'osm',
+      name: 'OpenStreetMap',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors'
+    }
+    // Add more basemaps here later, e.g. satellite imagery, a custom hosted basemap, etc.
+    // {
+    //   id: 'my-basemap',
+    //   name: 'My Custom Basemap',
+    //   tiles: ['https://tiles.bexarmaps.com/basemap/{z}/{x}/{y}.png'],
+    //   tileSize: 256,
+    //   scheme: 'tms'
+    // }
+  ];
+
+  const ORTHOMOSAICS = [
+    // Example structure for when the 1969/1986/1938 sets are ready:
+    // {
+    //   id: 'aerial-1969',
+    //   name: '1969 Aerial',
+    //   tiles: ['https://tiles.bexarmaps.com/1969/{z}/{x}/{y}.png'],
+    //   tileSize: 256,
+    //   scheme: 'tms',
+    //   defaultOpacity: 1,
+    //   defaultOn: false
+    // }
+  ];
+
+  const GEOREFERENCED_IMAGES = [
+    {
+      id: 'belmont-plat-1913',
+      name: '1913 Belmont Place Plat',
+      tiles: ['https://tiles.bexarmaps.com/plat-test/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      scheme: 'tms',
+      defaultOpacity: 0.85,
+      defaultOn: true
+    }
+  ];
+
+  // ---- END CONFIG ----
+
+  const style = {
+    version: 8,
+    sources: {},
+    layers: []
+  };
+
+  BASEMAPS.forEach((b, i) => {
+    style.sources[b.id] = {
+      type: 'raster',
+      tiles: b.tiles,
+      tileSize: b.tileSize || 256,
+      ...(b.scheme ? { scheme: b.scheme } : {})
+    };
+    style.layers.push({
+      id: b.id,
+      type: 'raster',
+      source: b.id,
+      layout: { visibility: i === 0 ? 'visible' : 'none' }
+    });
+  });
+
+  ORTHOMOSAICS.forEach(o => {
+    style.sources[o.id] = {
+      type: 'raster',
+      tiles: o.tiles,
+      tileSize: o.tileSize || 256,
+      ...(o.scheme ? { scheme: o.scheme } : {})
+    };
+    style.layers.push({
+      id: o.id,
+      type: 'raster',
+      source: o.id,
+      layout: { visibility: o.defaultOn ? 'visible' : 'none' },
+      paint: { 'raster-opacity': o.defaultOpacity ?? 1 }
+    });
+  });
+
+  GEOREFERENCED_IMAGES.forEach(g => {
+    style.sources[g.id] = {
+      type: 'raster',
+      tiles: g.tiles,
+      tileSize: g.tileSize || 256,
+      ...(g.scheme ? { scheme: g.scheme } : {})
+    };
+    style.layers.push({
+      id: g.id,
+      type: 'raster',
+      source: g.id,
+      layout: { visibility: g.defaultOn ? 'visible' : 'none' },
+      paint: { 'raster-opacity': g.defaultOpacity ?? 1 }
+    });
+  });
+
   const map = new maplibregl.Map({
     container: 'map',
-    style: {
-      version: 8,
-      sources: {
-        osm: {
-          type: 'raster',
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256
-        },
-        plat: {
-          type: 'raster',
-          tiles: ['https://tiles.bexarmaps.com/plat-test/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          scheme: 'tms'
-        }
-      },
-      layers: [
-        { id: 'osm', type: 'raster', source: 'osm' },
-        { id: 'plat', type: 'raster', source: 'plat', paint: { 'raster-opacity': 0.85 } }
-      ]
-    },
+    style: style,
     center: [-98.4949279, 29.4178686],
     zoom: 15
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+  // ---- Build Basemaps panel (radio behavior: only one visible at a time) ----
+  const basemapList = document.getElementById('basemap-list');
+  BASEMAPS.forEach((b, i) => {
+    const row = document.createElement('div');
+    row.className = 'basemap-row';
+    row.innerHTML = `
+      <label>
+        <input type="radio" name="basemap" value="${b.id}" ${i === 0 ? 'checked' : ''}>
+        ${b.name}
+      </label>
+    `;
+    basemapList.appendChild(row);
+  });
+  basemapList.addEventListener('change', (e) => {
+    if (e.target.name !== 'basemap') return;
+    BASEMAPS.forEach(b => {
+      map.setLayoutProperty(b.id, 'visibility', b.id === e.target.value ? 'visible' : 'none');
+    });
+  });
+
+  // ---- Build a toggle+opacity layer list (used for both Orthomosaics and Georeferenced Images) ----
+  function buildLayerList(containerId, layers) {
+    const container = document.getElementById(containerId);
+    if (layers.length === 0) {
+      container.innerHTML = '<div style="color:#888;">None yet</div>';
+      return;
+    }
+    layers.forEach(l => {
+      const row = document.createElement('div');
+      row.className = 'layer-row';
+      row.innerHTML = `
+        <label>
+          <input type="checkbox" data-layer="${l.id}" ${l.defaultOn ? 'checked' : ''}>
+          ${l.name}
+        </label>
+        <input type="range" data-opacity="${l.id}" min="0" max="1" step="0.05" value="${l.defaultOpacity ?? 1}">
+      `;
+      container.appendChild(row);
+    });
+    container.addEventListener('change', (e) => {
+      if (e.target.dataset.layer) {
+        map.setLayoutProperty(e.target.dataset.layer, 'visibility', e.target.checked ? 'visible' : 'none');
+      }
+    });
+    container.addEventListener('input', (e) => {
+      if (e.target.dataset.opacity) {
+        map.setPaintProperty(e.target.dataset.opacity, 'raster-opacity', parseFloat(e.target.value));
+      }
+    });
+  }
+
+  buildLayerList('ortho-list', ORTHOMOSAICS);
+  buildLayerList('georef-list', GEOREFERENCED_IMAGES);
+
+  // ---- Collapsible panels ----
+  document.querySelectorAll('.panel-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const body = header.nextElementSibling;
+      body.classList.toggle('collapsed');
+      const chevron = header.querySelector('.chevron');
+      chevron.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
+    });
   });
 </script>
 </body>
