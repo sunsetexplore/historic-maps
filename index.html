@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Bexar County Historic Aerials</title>
+  <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet" />
+  <style> body { margin: 0; } #map { height: 100vh; } </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: {
+      version: 8,
+      sources: {
+        osm: {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256
+        },
+        plat: {
+          type: 'raster',
+          tiles: ['https://tiles.bexaraerials.com/plat-test/{z}/{x}/{y}.png'],
+          tileSize: 256
+        }
+      },
+      layers: [
+        { id: 'osm', type: 'raster', source: 'osm' },
+        { id: 'plat', type: 'raster', source: 'plat', paint: { 'raster-opacity': 0.85 } }
+      ]
+    },
+    center: [29.4178686,-98.4949279],
+    zoom: 15
+  });
+</script>
+</body>
+</html>
