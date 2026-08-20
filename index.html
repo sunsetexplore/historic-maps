@@ -245,7 +245,7 @@
     },
     paint: {
       'line-color': '#1a1a1a',
-      'line-opacity': 0.35,
+      'line-opacity': 0.15,
       'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 2.5, 18, 5.5]
     }
   });
@@ -264,7 +264,7 @@
     },
     paint: {
       'line-color': '#ffffff',
-      'line-opacity': 0.85,
+      'line-opacity': 0.3,
       'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 18, 4]
     }
   });
@@ -332,7 +332,9 @@
   document.getElementById('road-overlay-toggle').addEventListener('change', (e) => {
     const visibility = e.target.checked ? 'visible' : 'none';
     ROAD_OVERLAY.layerIds.forEach(id => {
-      map.setLayoutProperty(id, 'visibility', visibility);
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', visibility);
+      }
     });
   });
 
