@@ -182,21 +182,6 @@
     });
   });
 
-  // Road overlay — added right after basemaps so it draws above them but below
-  // orthomosaics/georeferenced images (those cover roads intentionally when toggled on).
-  style.sources[ROAD_OVERLAY.id] = {
-    type: 'raster',
-    tiles: ROAD_OVERLAY.tiles,
-    tileSize: ROAD_OVERLAY.tileSize || 256
-  };
-  style.layers.push({
-    id: ROAD_OVERLAY.id,
-    type: 'raster',
-    source: ROAD_OVERLAY.id,
-    layout: { visibility: ROAD_OVERLAY.defaultOn ? 'visible' : 'none' },
-    paint: { 'raster-opacity': ROAD_OVERLAY.defaultOpacity ?? 1 }
-  });
-
   ORTHOMOSAICS.forEach(o => {
     style.sources[o.id] = {
       type: 'raster',
@@ -227,6 +212,21 @@
       layout: { visibility: g.defaultOn ? 'visible' : 'none' },
       paint: { 'raster-opacity': g.defaultOpacity ?? 1 }
     });
+  });
+
+  // Road overlay — added last so it always draws on top of orthomosaics and
+  // georeferenced images, regardless of layer order above.
+  style.sources[ROAD_OVERLAY.id] = {
+    type: 'raster',
+    tiles: ROAD_OVERLAY.tiles,
+    tileSize: ROAD_OVERLAY.tileSize || 256
+  };
+  style.layers.push({
+    id: ROAD_OVERLAY.id,
+    type: 'raster',
+    source: ROAD_OVERLAY.id,
+    layout: { visibility: ROAD_OVERLAY.defaultOn ? 'visible' : 'none' },
+    paint: { 'raster-opacity': ROAD_OVERLAY.defaultOpacity ?? 1 }
   });
 
   const map = new maplibregl.Map({
