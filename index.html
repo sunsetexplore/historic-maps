@@ -77,7 +77,10 @@
 <div id="panels">
   <div class="panel" data-panel="basemaps">
     <div class="panel-header">Basemaps <span class="chevron">▾</span></div>
-    <div class="panel-body" id="basemap-list"></div>
+    <div class="panel-body">
+      <div id="basemap-list"></div>
+      <div id="road-toggle-row" style="margin-top:8px; padding-top:8px; border-top:1px solid #ddd;"></div>
+    </div>
   </div>
 
   <div class="panel" data-panel="orthomosaics">
@@ -101,8 +104,15 @@
       tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
       attribution: '© OpenStreetMap contributors'
+    },
+    {
+      id: 'pictometry-2025',
+      name: 'Aerial 2025 (Pictometry)',
+      tiles: ['https://svc.pictometry.com/Image/880F0C48-8610-0234-E927-2FD8CF8DDC5A/wmts/PICT-TXCSAN25-xbkfA5zP90/default/GoogleMapsCompatible/{z}/{x}/{y}.png'],
+      tileSize: 256
+      // no scheme needed — GoogleMapsCompatible is standard XYZ, not TMS
     }
-    // Add more basemaps here later, e.g. satellite imagery, a custom hosted basemap, etc.
+    // Add more basemaps here later, e.g. a custom hosted basemap.
     // {
     //   id: 'my-basemap',
     //   name: 'My Custom Basemap',
@@ -111,6 +121,18 @@
     //   scheme: 'tms'
     // }
   ];
+
+  // Roads overlay — toggles independently on top of whichever basemap is active.
+  // Esri World Transportation: roads only, transparent background, no API key needed.
+  // Note the {z}/{y}/{x} order here — Esri's tile scheme, different from {z}/{x}/{y} used elsewhere.
+  const ROAD_OVERLAY = {
+    id: 'road-overlay',
+    name: 'Roads',
+    tiles: ['https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'],
+    tileSize: 256,
+    defaultOpacity: 1,
+    defaultOn: false
+  };
 
   const ORTHOMOSAICS = [
     {
@@ -158,6 +180,21 @@
       source: b.id,
       layout: { visibility: i === 0 ? 'visible' : 'none' }
     });
+  });
+
+  // Road overlay — added right after basemaps so it draws above them but below
+  // orthomosaics/georeferenced images (those cover roads intentionally when toggled on).
+  style.sources[ROAD_OVERLAY.id] = {
+    type: 'raster',
+    tiles: ROAD_OVERLAY.tiles,
+    tileSize: ROAD_OVERLAY.tileSize || 256
+  };
+  style.layers.push({
+    id: ROAD_OVERLAY.id,
+    type: 'raster',
+    source: ROAD_OVERLAY.id,
+    layout: { visibility: ROAD_OVERLAY.defaultOn ? 'visible' : 'none' },
+    paint: { 'raster-opacity': ROAD_OVERLAY.defaultOpacity ?? 1 }
   });
 
   ORTHOMOSAICS.forEach(o => {
@@ -219,6 +256,18 @@
     BASEMAPS.forEach(b => {
       map.setLayoutProperty(b.id, 'visibility', b.id === e.target.value ? 'visible' : 'none');
     });
+  });
+
+  // ---- Build Roads toggle (independent checkbox, not part of the basemap radio group) ----
+  const roadToggleRow = document.getElementById('road-toggle-row');
+  roadToggleRow.innerHTML = `
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="road-overlay-toggle" ${ROAD_OVERLAY.defaultOn ? 'checked' : ''}>
+      ${ROAD_OVERLAY.name}
+    </label>
+  `;
+  document.getElementById('road-overlay-toggle').addEventListener('change', (e) => {
+    map.setLayoutProperty(ROAD_OVERLAY.id, 'visibility', e.target.checked ? 'visible' : 'none');
   });
 
   // ---- Build a toggle+opacity layer list (used for both Orthomosaics and Georeferenced Images) ----
