@@ -123,15 +123,16 @@
   ];
 
   // Roads overlay — toggles independently on top of whichever basemap is active.
-  // Esri World Transportation: roads only, transparent background, no API key needed.
-  // Note the {z}/{y}/{x} order here — Esri's tile scheme, different from {z}/{x}/{y} used elsewhere.
+  // Vector tiles (OpenFreeMap, free/no-key, OpenMapTiles schema) instead of a pre-rendered
+  // raster service — this gives full control over line weight/color and label styling
+  // so it reads as a clean custom overlay rather than someone else's map skin.
   const ROAD_OVERLAY = {
-    id: 'road-overlay',
     name: 'Roads',
-    tiles: ['https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'],
-    tileSize: 256,
-    defaultOpacity: 1,
-    defaultOn: false
+    defaultOn: false,
+    sourceId: 'road-overlay-src',
+    vectorUrl: 'https://tiles.openfreemap.org/planet',
+    // Layer ids added to the map — kept in one place so the toggle can flip all of them at once.
+    layerIds: ['road-overlay-casing', 'road-overlay-line', 'road-overlay-label']
   };
 
   const ORTHOMOSAICS = [
@@ -163,6 +164,8 @@
 
   const style = {
     version: 8,
+    // Required for the road label text layer below (vector tiles need a glyph source for text rendering).
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {},
     layers: []
   };
@@ -216,17 +219,77 @@
 
   // Road overlay — added last so it always draws on top of orthomosaics and
   // georeferenced images, regardless of layer order above.
-  style.sources[ROAD_OVERLAY.id] = {
-    type: 'raster',
-    tiles: ROAD_OVERLAY.tiles,
-    tileSize: ROAD_OVERLAY.tileSize || 256
+  // Filtered to real roads (motorway/trunk/primary/secondary/tertiary/minor) — hides
+  // footpaths/service roads/rail so it stays clean rather than cluttered at wider zooms.
+  style.sources[ROAD_OVERLAY.sourceId] = {
+    type: 'vector',
+    url: ROAD_OVERLAY.vectorUrl
   };
+
+  const ROAD_CLASS_FILTER = ['match', ['get', 'class'],
+    ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor'], true,
+    false
+  ];
+
+  // Dark, semi-transparent casing under the line for contrast against light/busy imagery.
   style.layers.push({
-    id: ROAD_OVERLAY.id,
-    type: 'raster',
-    source: ROAD_OVERLAY.id,
-    layout: { visibility: ROAD_OVERLAY.defaultOn ? 'visible' : 'none' },
-    paint: { 'raster-opacity': ROAD_OVERLAY.defaultOpacity ?? 1 }
+    id: 'road-overlay-casing',
+    type: 'line',
+    source: ROAD_OVERLAY.sourceId,
+    'source-layer': 'transportation',
+    filter: ROAD_CLASS_FILTER,
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round',
+      visibility: ROAD_OVERLAY.defaultOn ? 'visible' : 'none'
+    },
+    paint: {
+      'line-color': '#1a1a1a',
+      'line-opacity': 0.35,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 2.5, 18, 5.5]
+    }
+  });
+
+  // Thin white line on top of the casing — subtle at a glance, clear enough to trace at zoom.
+  style.layers.push({
+    id: 'road-overlay-line',
+    type: 'line',
+    source: ROAD_OVERLAY.sourceId,
+    'source-layer': 'transportation',
+    filter: ROAD_CLASS_FILTER,
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round',
+      visibility: ROAD_OVERLAY.defaultOn ? 'visible' : 'none'
+    },
+    paint: {
+      'line-color': '#ffffff',
+      'line-opacity': 0.85,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 18, 4]
+    }
+  });
+
+  // Small, clean labels with a dark halo for legibility — only shows at zooms where it's useful.
+  style.layers.push({
+    id: 'road-overlay-label',
+    type: 'symbol',
+    source: ROAD_OVERLAY.sourceId,
+    'source-layer': 'transportation_name',
+    filter: ROAD_CLASS_FILTER,
+    minzoom: 12,
+    layout: {
+      visibility: ROAD_OVERLAY.defaultOn ? 'visible' : 'none',
+      'symbol-placement': 'line',
+      'text-field': ['get', 'name'],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 13],
+      'text-letter-spacing': 0.02
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': '#000000',
+      'text-halo-width': 1.2
+    }
   });
 
   const map = new maplibregl.Map({
@@ -267,7 +330,10 @@
     </label>
   `;
   document.getElementById('road-overlay-toggle').addEventListener('change', (e) => {
-    map.setLayoutProperty(ROAD_OVERLAY.id, 'visibility', e.target.checked ? 'visible' : 'none');
+    const visibility = e.target.checked ? 'visible' : 'none';
+    ROAD_OVERLAY.layerIds.forEach(id => {
+      map.setLayoutProperty(id, 'visibility', visibility);
+    });
   });
 
   // ---- Build a toggle+opacity layer list (used for both Orthomosaics and Georeferenced Images) ----
