@@ -73,7 +73,7 @@
     #scale-indicator {
       position: absolute;
       bottom: 12px;
-      right: 12px;
+      left: 12px;
       z-index: 1;
       background: rgba(255,255,255,0.95);
       border-radius: 6px;
@@ -311,7 +311,7 @@
     container: 'map',
     style: style,
     center: [-98.4949279, 29.4178686],
-    zoom: 13.65 // approximates 1:40,000 at this latitude — see updateScaleIndicator() for the math
+    zoom: 12.65 // approximates 1:80,000 at this latitude — see updateScaleIndicator() for the math
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-left');
