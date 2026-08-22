@@ -69,10 +69,25 @@
       gap: 6px;
       margin-bottom: 6px;
     }
+
+    #scale-indicator {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      z-index: 1;
+      background: rgba(255,255,255,0.95);
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+    }
   </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="scale-indicator">1:—</div>
 
 <div id="panels">
   <div class="panel" data-panel="basemaps">
@@ -296,10 +311,29 @@
     container: 'map',
     style: style,
     center: [-98.4949279, 29.4178686],
-    zoom: 15
+    zoom: 13.65 // approximates 1:40,000 at this latitude — see updateScaleIndicator() for the math
   });
 
   map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+  // ---- Scale indicator (bottom-right, "1:X" representative fraction) ----
+  // Standard web-map scale math: ground resolution (m/px) depends on zoom AND latitude
+  // (Web Mercator distortion), then converted to a screen scale ratio assuming 96 DPI —
+  // the common convention (matches ArcGIS Online's default), though actual screen DPI
+  // varies by device, so this is an approximation like any web map scale indicator.
+  const scaleIndicator = document.getElementById('scale-indicator');
+  function updateScaleIndicator() {
+    const zoom = map.getZoom();
+    const lat = map.getCenter().lat;
+    const metersPerPixel = 156543.03392804097 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    const dpi = 96;
+    const scaleDenominator = metersPerPixel * dpi / 0.0254;
+    const rounded = Math.round(scaleDenominator / 100) * 100;
+    scaleIndicator.textContent = `1:${rounded.toLocaleString()}`;
+  }
+  map.on('zoom', updateScaleIndicator);
+  map.on('move', updateScaleIndicator);
+  map.on('load', updateScaleIndicator);
 
   // ---- Build Basemaps panel (radio behavior: only one visible at a time) ----
   const basemapList = document.getElementById('basemap-list');
